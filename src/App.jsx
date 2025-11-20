@@ -1,6 +1,42 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AlertCircle, Bell, FileText, Users, Download, Plus, Search, Trash2, Edit, CheckCircle, Clock, XCircle, LogOut, Shield, Key, Mail } from 'lucide-react';
 
+import storage from './utils/storage';
+
+// Initialize storage
+const initializeStorage = async () => {
+  const initialized = await storage.exists('app-initialized');
+  
+  if (!initialized) {
+    await storage.batchSet({
+      'users': [{ id: 1, email: 'admin@acme.com', password: 'admin123' }],
+      'vendors': [],
+      'documents': [],
+      'app-initialized': true
+    });
+  }
+};
+
+// Load data
+const loadData = async () => {
+  const data = await storage.batchGet([
+    'users',
+    'vendors', 
+    'documents',
+    'reminders',
+    'audit-logs'
+  ]);
+  
+  return data;
+};
+
+// Save vendor
+const saveVendor = async (vendor) => {
+  const vendors = await storage.get('vendors') || [];
+  vendors.push(vendor);
+  await storage.set('vendors', vendors);
+};
+
 // Storage initialization
 const initializeStorage = async () => {
   try {
