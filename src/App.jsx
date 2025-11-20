@@ -10,39 +10,58 @@ const initializeStorage = async () => {
     } catch (error) {
       console.log('Storage not yet initialized, creating data...');
     }
-    
+
     if (!existing) {
       await window.storage.set('organization', JSON.stringify({
         id: 'org-1', name: 'Acme Corporation', timezone: 'America/New_York',
         settings: { reminderDays: [30, 14, 7, 1], defaultChannel: 'email' }
       }));
-      
+
       await window.storage.set('users', JSON.stringify([
         { id: 'u1', email: 'admin@acme.com', password: 'admin123', name: 'Admin User', role: 'admin', twoFactorEnabled: false },
         { id: 'u2', email: 'user@acme.com', password: 'user123', name: 'Regular User', role: 'user', twoFactorEnabled: false }
       ]));
-      
+
       await window.storage.set('vendors', JSON.stringify([
         { id: 'v1', name: 'TechSupply Inc', type: 'software', contact: 'john@techsupply.com', status: 'active' },
         { id: 'v2', name: 'BuildCo Contractors', type: 'contractor', contact: 'mary@buildco.com', status: 'active' },
         { id: 'v3', name: 'Office Supplies Ltd', type: 'supplier', contact: 'sales@officesup.com', status: 'active' }
       ]));
-      
+
       await window.storage.set('documents', JSON.stringify([
         { id: 'd1', vendorId: 'v1', title: 'Software License', type: 'license', issuedAt: '2024-01-15', expiresAt: '2025-12-15', status: 'active', uploadedBy: 'Admin' },
         { id: 'd2', vendorId: 'v2', title: 'Liability Insurance', type: 'insurance', issuedAt: '2024-06-01', expiresAt: '2025-11-25', status: 'active', uploadedBy: 'Admin' },
         { id: 'd3', vendorId: 'v2', title: 'W-9 Tax Form', type: 'w9', issuedAt: '2024-01-10', expiresAt: '2025-11-20', status: 'active', uploadedBy: 'Admin' },
         { id: 'd4', vendorId: 'v3', title: 'Certificate of Insurance', type: 'insurance', issuedAt: '2024-03-01', expiresAt: '2025-11-22', status: 'active', uploadedBy: 'Admin' }
       ]));
-      
+
       await window.storage.set('reminders', JSON.stringify([]));
       await window.storage.set('audit-logs', JSON.stringify([]));
       await window.storage.set('app-initialized', 'true');
-      
+
       console.log('Storage initialized successfully!');
     }
   } catch (error) {
     console.error('Storage initialization error:', error);
+  }
+};
+
+// Safe storage wrapper
+const storage = {
+  get: async (key) => {
+    if (window.storage && typeof window.storage.get === 'function') {
+      const result = await window.storage.get(key);
+      return result ? JSON.parse(result.value || result) : null;
+    }
+    console.warn('window.storage not available, returning null for', key);
+    return null;
+  },
+  set: async (key, value) => {
+    if (window.storage && typeof window.storage.set === 'function') {
+      await window.storage.set(key, JSON.stringify(value));
+    } else {
+      console.warn('window.storage not available, cannot set', key);
+    }
   }
 };
 
@@ -142,28 +161,29 @@ const VendorDocTracker = () => {
     setLoading(true);
     try {
       await initializeStorage();
+
       const [orgData, vendorData, docData, reminderData, auditData] = await Promise.all([
-        window.storage.get('organization'),
-        window.storage.get('vendors'),
-        window.storage.get('documents'),
-        window.storage.get('reminders'),
-        window.storage.get('audit-logs')
+        storage.get('organization'),
+        storage.get('vendors'),
+        storage.get('documents'),
+        storage.get('reminders'),
+        storage.get('audit-logs')
       ]);
-      
-      if (orgData) setOrganization(JSON.parse(orgData.value));
-      if (vendorData) setVendors(JSON.parse(vendorData.value));
-      if (docData) setDocuments(JSON.parse(docData.value));
-      if (reminderData) setReminders(JSON.parse(reminderData.value));
-      if (auditData) setAuditLogs(JSON.parse(auditData.value));
+
+      if (orgData) setOrganization(orgData);
+      if (vendorData) setVendors(vendorData);
+      if (docData) setDocuments(docData);
+      if (reminderData) setReminders(reminderData);
+      if (auditData) setAuditLogs(auditData);
     } catch (error) {
-      console.error('Error loading:', error);
+      console.error('Error loading data:', error);
     }
     setLoading(false);
   };
 
   const saveData = useCallback(async (key, data, setter) => {
     try {
-      await window.storage.set(key, JSON.stringify(data));
+      await storage.set(key, data);
       setter(data);
     } catch (error) {
       console.error(`Error saving ${key}:`, error);
