@@ -3,83 +3,81 @@ import { AlertCircle, Bell, FileText, Users, Download, Plus, Search, Trash2, Edi
 
 import storage from './utils/storage';
 
-// Initialize storage
-const initializeStorage = async () => {
-  const initialized = await storage.exists('app-initialized');
-  
-  if (!initialized) {
-    await storage.batchSet({
-      'users': [{ id: 1, email: 'admin@acme.com', password: 'admin123' }],
-      'vendors': [],
-      'documents': [],
-      'app-initialized': true
-    });
-  }
-};
-
-// Load data
-const loadData = async () => {
-  const data = await storage.batchGet([
-    'users',
-    'vendors', 
-    'documents',
-    'reminders',
-    'audit-logs'
-  ]);
-  
-  return data;
-};
-
-// Save vendor
-const saveVendor = async (vendor) => {
-  const vendors = await storage.get('vendors') || [];
-  vendors.push(vendor);
-  await storage.set('vendors', vendors);
-};
-
-// Storage initialization
+// Storage initialization (merged & fixed)
 const initializeStorage = async () => {
   try {
-    let existing = null;
-    try {
-      existing = await window.storage.get('app-initialized');
-    } catch (error) {
-      console.log('Storage not yet initialized, creating data...');
-    }
-    
-    if (!existing) {
-      await window.storage.set('organization', JSON.stringify({
-        id: 'org-1', name: 'Acme Corporation', timezone: 'America/New_York',
+    const initialized = await storage.exists('app-initialized');
+
+    if (!initialized) {
+      // Set default organization
+      await storage.set('organization', JSON.stringify({
+        id: 'org-1',
+        name: 'Acme Corporation',
+        timezone: 'America/New_York',
         settings: { reminderDays: [30, 14, 7, 1], defaultChannel: 'email' }
       }));
-      
-      await window.storage.set('users', JSON.stringify([
+
+      // Set default users
+      await storage.set('users', JSON.stringify([
         { id: 'u1', email: 'admin@acme.com', password: 'admin123', name: 'Admin User', role: 'admin', twoFactorEnabled: false },
         { id: 'u2', email: 'user@acme.com', password: 'user123', name: 'Regular User', role: 'user', twoFactorEnabled: false }
       ]));
-      
-      await window.storage.set('vendors', JSON.stringify([
+
+      // Set default vendors
+      await storage.set('vendors', JSON.stringify([
         { id: 'v1', name: 'TechSupply Inc', type: 'software', contact: 'john@techsupply.com', status: 'active' },
         { id: 'v2', name: 'BuildCo Contractors', type: 'contractor', contact: 'mary@buildco.com', status: 'active' },
         { id: 'v3', name: 'Office Supplies Ltd', type: 'supplier', contact: 'sales@officesup.com', status: 'active' }
       ]));
-      
-      await window.storage.set('documents', JSON.stringify([
+
+      // Set default documents
+      await storage.set('documents', JSON.stringify([
         { id: 'd1', vendorId: 'v1', title: 'Software License', type: 'license', issuedAt: '2024-01-15', expiresAt: '2025-12-15', status: 'active', uploadedBy: 'Admin' },
         { id: 'd2', vendorId: 'v2', title: 'Liability Insurance', type: 'insurance', issuedAt: '2024-06-01', expiresAt: '2025-11-25', status: 'active', uploadedBy: 'Admin' },
         { id: 'd3', vendorId: 'v2', title: 'W-9 Tax Form', type: 'w9', issuedAt: '2024-01-10', expiresAt: '2025-11-20', status: 'active', uploadedBy: 'Admin' },
         { id: 'd4', vendorId: 'v3', title: 'Certificate of Insurance', type: 'insurance', issuedAt: '2024-03-01', expiresAt: '2025-11-22', status: 'active', uploadedBy: 'Admin' }
       ]));
-      
-      await window.storage.set('reminders', JSON.stringify([]));
-      await window.storage.set('audit-logs', JSON.stringify([]));
-      await window.storage.set('app-initialized', 'true');
-      
+
+      // Empty reminders and audit logs
+      await storage.set('reminders', JSON.stringify([]));
+      await storage.set('audit-logs', JSON.stringify([]));
+
+      // Mark storage as initialized
+      await storage.set('app-initialized', 'true');
+
       console.log('Storage initialized successfully!');
     }
   } catch (error) {
     console.error('Storage initialization error:', error);
   }
+};
+
+// Load data
+const loadData = async (setters) => {
+  try {
+    const [orgData, vendorData, docData, reminderData, auditData] = await Promise.all([
+      storage.get('organization'),
+      storage.get('vendors'),
+      storage.get('documents'),
+      storage.get('reminders'),
+      storage.get('audit-logs')
+    ]);
+
+    if (orgData && setters.setOrganization) setters.setOrganization(JSON.parse(orgData.value));
+    if (vendorData && setters.setVendors) setters.setVendors(JSON.parse(vendorData.value));
+    if (docData && setters.setDocuments) setters.setDocuments(JSON.parse(docData.value));
+    if (reminderData && setters.setReminders) setters.setReminders(JSON.parse(reminderData.value));
+    if (auditData && setters.setAuditLogs) setters.setAuditLogs(JSON.parse(auditData.value));
+  } catch (error) {
+    console.error('Error loading data:', error);
+  }
+};
+
+// Save vendor
+const saveVendor = async (vendor, vendors, setVendors) => {
+  const updated = [...vendors, vendor];
+  await storage.set('vendors', updated);
+  setVendors(updated);
 };
 
 // Utility functions
