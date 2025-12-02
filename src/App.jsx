@@ -1,101 +1,86 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { AlertCircle, Bell, FileText, Users, Download, Plus, Search, Trash2, Edit, CheckCircle, Clock, XCircle, LogOut, Shield, Key, Mail } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  AlertCircle, 
+  Bell, 
+  FileText, 
+  Users, 
+  Download, 
+  Plus, 
+  Search, 
+  Trash2, 
+  Edit, 
+  CheckCircle, 
+  Clock, 
+  XCircle, 
+  LogOut, 
+  Shield 
+} from 'lucide-react';
 
-import storage from './utils/storage';
+// ============================================
+// COMPONENTS
+// ============================================
 
-// Storage initialization (merged & fixed)
-const initializeStorage = async () => {
-  try {
-    const initialized = await storage.exists('app-initialized');
+// Loading Spinner Component
+const LoadingSpinner = ({ size = 'medium', message }) => {
+  const sizes = {
+    small: 'h-8 w-8',
+    medium: 'h-16 w-16',
+    large: 'h-24 w-24'
+  };
 
-    if (!initialized) {
-      // Set default organization
-      await storage.set('organization', JSON.stringify({
-        id: 'org-1',
-        name: 'Acme Corporation',
-        timezone: 'America/New_York',
-        settings: { reminderDays: [30, 14, 7, 1], defaultChannel: 'email' }
-      }));
-
-      // Set default users
-      await storage.set('users', JSON.stringify([
-        { id: 'u1', email: 'admin@acme.com', password: 'admin123', name: 'Admin User', role: 'admin', twoFactorEnabled: false },
-        { id: 'u2', email: 'user@acme.com', password: 'user123', name: 'Regular User', role: 'user', twoFactorEnabled: false }
-      ]));
-
-      // Set default vendors
-      await storage.set('vendors', JSON.stringify([
-        { id: 'v1', name: 'TechSupply Inc', type: 'software', contact: 'john@techsupply.com', status: 'active' },
-        { id: 'v2', name: 'BuildCo Contractors', type: 'contractor', contact: 'mary@buildco.com', status: 'active' },
-        { id: 'v3', name: 'Office Supplies Ltd', type: 'supplier', contact: 'sales@officesup.com', status: 'active' }
-      ]));
-
-      // Set default documents
-      await storage.set('documents', JSON.stringify([
-        { id: 'd1', vendorId: 'v1', title: 'Software License', type: 'license', issuedAt: '2024-01-15', expiresAt: '2025-12-15', status: 'active', uploadedBy: 'Admin' },
-        { id: 'd2', vendorId: 'v2', title: 'Liability Insurance', type: 'insurance', issuedAt: '2024-06-01', expiresAt: '2025-11-25', status: 'active', uploadedBy: 'Admin' },
-        { id: 'd3', vendorId: 'v2', title: 'W-9 Tax Form', type: 'w9', issuedAt: '2024-01-10', expiresAt: '2025-11-20', status: 'active', uploadedBy: 'Admin' },
-        { id: 'd4', vendorId: 'v3', title: 'Certificate of Insurance', type: 'insurance', issuedAt: '2024-03-01', expiresAt: '2025-11-22', status: 'active', uploadedBy: 'Admin' }
-      ]));
-
-      // Empty reminders and audit logs
-      await storage.set('reminders', JSON.stringify([]));
-      await storage.set('audit-logs', JSON.stringify([]));
-
-      // Mark storage as initialized
-      await storage.set('app-initialized', 'true');
-
-      console.log('Storage initialized successfully!');
-    }
-  } catch (error) {
-    console.error('Storage initialization error:', error);
-  }
+  return (
+    <div className="flex flex-col items-center justify-center p-8">
+      <div className={`animate-spin rounded-full border-4 border-blue-600 border-t-transparent ${sizes[size]}`}></div>
+      {message && <p className="mt-4 text-gray-700 font-medium">{message}</p>}
+    </div>
+  );
 };
 
-// Load data
-const loadData = async (setters) => {
-  try {
-    const [orgData, vendorData, docData, reminderData, auditData] = await Promise.all([
-      storage.get('organization'),
-      storage.get('vendors'),
-      storage.get('documents'),
-      storage.get('reminders'),
-      storage.get('audit-logs')
-    ]);
+// Error Alert Component
+const ErrorAlert = ({ error, onClose }) => {
+  if (!error) return null;
 
-    if (orgData && setters.setOrganization) setters.setOrganization(JSON.parse(orgData.value));
-    if (vendorData && setters.setVendors) setters.setVendors(JSON.parse(vendorData.value));
-    if (docData && setters.setDocuments) setters.setDocuments(JSON.parse(docData.value));
-    if (reminderData && setters.setReminders) setters.setReminders(JSON.parse(reminderData.value));
-    if (auditData && setters.setAuditLogs) setters.setAuditLogs(JSON.parse(auditData.value));
-  } catch (error) {
-    console.error('Error loading data:', error);
-  }
+  const getMessage = (error) => {
+    if (typeof error === 'string') return error;
+    if (error.message) return error.message;
+    return 'An unexpected error occurred';
+  };
+
+  return (
+    <div className="bg-red-50 border-2 border-red-200 rounded-lg p-4 mb-4 flex items-start gap-3">
+      <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+      <div className="flex-1">
+        <p className="text-sm text-red-800 font-medium">{getMessage(error)}</p>
+      </div>
+      {onClose && (
+        <button onClick={onClose} className="text-red-600 hover:text-red-800 transition">
+          <XCircle className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  );
 };
 
-// Save vendor
-const saveVendor = async (vendor, vendors, setVendors) => {
-  const updated = [...vendors, vendor];
-  await storage.set('vendors', updated);
-  setVendors(updated);
+// Success Alert Component
+const SuccessAlert = ({ message, onClose }) => {
+  if (!message) return null;
+
+  return (
+    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4 flex items-start gap-3">
+      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+      <div className="flex-1">
+        <p className="text-sm text-green-800 font-medium">{message}</p>
+      </div>
+      {onClose && (
+        <button onClick={onClose} className="text-green-600 hover:text-green-800 transition">
+          <XCircle className="w-5 h-5" />
+        </button>
+      )}
+    </div>
+  );
 };
 
-// Utility functions
-const getDaysUntilExpiration = (expiresAt) => {
-  const today = new Date();
-  const expiry = new Date(expiresAt);
-  return Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-};
-
-const getDocumentStatus = (expiresAt) => {
-  const days = getDaysUntilExpiration(expiresAt);
-  if (days < 0) return { status: 'expired', label: 'Expired', color: 'text-red-600 bg-red-100 border-red-200' };
-  if (days <= 7) return { status: 'critical', label: 'Critical', color: 'text-orange-600 bg-orange-100 border-orange-200' };
-  if (days <= 30) return { status: 'warning', label: 'Expiring Soon', color: 'text-yellow-600 bg-yellow-100 border-yellow-200' };
-  return { status: 'active', label: 'Active', color: 'text-green-600 bg-green-100 border-green-200' };
-};
-
-// Reusable Badge Component
+// Badge Component
 const Badge = ({ children, variant = 'default', className = '' }) => {
   const variants = {
     default: 'bg-gray-100 text-gray-700 border-gray-200',
@@ -121,6 +106,85 @@ const EmptyState = ({ icon: Icon, title, description }) => (
   </div>
 );
 
+// Confirm Dialog Component
+const ConfirmDialog = ({ isOpen, title, message, onConfirm, onCancel, confirmText = 'Confirm' }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-red-100 p-3 rounded-full">
+              <AlertCircle className="w-6 h-6 text-red-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+          </div>
+          <p className="text-gray-600 mb-6">{message}</p>
+          <div className="flex gap-3">
+            <button
+              onClick={onCancel}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition"
+            >
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Error Boundary Component
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full">
+            <div className="flex items-center justify-center mb-4">
+              <div className="bg-red-100 p-3 rounded-full">
+                <AlertCircle className="w-12 h-12 text-red-600" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-center mb-2">Oops! Something went wrong</h1>
+            <p className="text-gray-600 text-center mb-6">
+              Please try refreshing the page.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // Stat Card Component
 const StatCard = ({ title, value, icon: Icon, gradient }) => (
   <div className={`bg-gradient-to-br ${gradient} p-6 rounded-2xl shadow-lg text-white transform hover:scale-105 transition-transform`}>
@@ -134,38 +198,416 @@ const StatCard = ({ title, value, icon: Icon, gradient }) => (
   </div>
 );
 
-// Main Component
+// Vendor Modal Component
+const VendorModal = ({ vendor, onClose, onSave, loading }) => {
+  const [formData, setFormData] = useState(vendor || { name: '', type: 'contractor', contact: '', notes: '' });
+  const [errors, setErrors] = useState({});
+
+  const handleSubmit = async () => {
+    const newErrors = {};
+    if (!formData.name) newErrors.name = 'Name is required';
+    if (!formData.contact) newErrors.contact = 'Contact is required';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    await onSave(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-t-xl">
+          <h2 className="text-xl font-bold text-white">{vendor ? 'Edit Vendor' : 'Add New Vendor'}</h2>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Vendor Name *</label>
+            <input 
+              type="text" 
+              value={formData.name} 
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {errors.name && <p className="text-red-600 text-sm mt-1">{errors.name}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Type *</label>
+            <select 
+              value={formData.type} 
+              onChange={(e) => setFormData({...formData, type: e.target.value})}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="contractor">Contractor</option>
+              <option value="software">Software</option>
+              <option value="supplier">Supplier</option>
+              <option value="consultant">Consultant</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Contact Email *</label>
+            <input 
+              type="email" 
+              value={formData.contact} 
+              onChange={(e) => setFormData({...formData, contact: e.target.value})}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            {errors.contact && <p className="text-red-600 text-sm mt-1">{errors.contact}</p>}
+          </div>
+          <div className="flex gap-3 pt-4">
+            <button 
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleSubmit}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 shadow-md disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : vendor ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Document Modal Component
+const DocumentModal = ({ document, vendors, selectedVendor, onClose, onSave }) => {
+  const [formData, setFormData] = useState(document || {
+    vendorId: selectedVendor || '', 
+    title: '', 
+    type: 'license', 
+    issuedAt: '', 
+    expiresAt: ''
+  });
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
+
+  const handleSubmit = async () => {
+    const newErrors = {};
+    if (!formData.vendorId) newErrors.vendorId = 'Vendor is required';
+    if (!formData.title) newErrors.title = 'Document title is required';
+    if (!formData.expiresAt) newErrors.expiresAt = 'Expiration date is required';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave(formData);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 rounded-t-xl sticky top-0">
+          <h2 className="text-xl font-bold text-white">{document ? 'Edit Document' : 'Add New Document'}</h2>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Vendor *</label>
+            <select 
+              value={formData.vendorId} 
+              onChange={(e) => handleChange('vendorId', e.target.value)}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Select a vendor</option>
+              {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+            </select>
+            {errors.vendorId && <p className="text-red-600 text-sm mt-1">{errors.vendorId}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Document Title *</label>
+            <input 
+              type="text" 
+              value={formData.title} 
+              onChange={(e) => handleChange('title', e.target.value)}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+            />
+            {errors.title && <p className="text-red-600 text-sm mt-1">{errors.title}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Type *</label>
+            <select 
+              value={formData.type} 
+              onChange={(e) => handleChange('type', e.target.value)}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="license">License</option>
+              <option value="insurance">Insurance</option>
+              <option value="w9">W-9</option>
+              <option value="certificate">Certificate</option>
+              <option value="contract">Contract</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Issue Date</label>
+            <input 
+              type="date" 
+              value={formData.issuedAt} 
+              onChange={(e) => handleChange('issuedAt', e.target.value)}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Expiration Date *</label>
+            <input 
+              type="date" 
+              value={formData.expiresAt} 
+              onChange={(e) => handleChange('expiresAt', e.target.value)}
+              className="w-full px-4 py-2.5 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+            />
+            {errors.expiresAt && <p className="text-red-600 text-sm mt-1">{errors.expiresAt}</p>}
+          </div>
+          {!document && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800 font-medium flex items-center gap-2">
+                <Bell className="w-4 h-4" />Auto-reminders will be created at 30, 14, 7, and 1 days before expiration
+              </p>
+            </div>
+          )}
+          <div className="flex gap-3 pt-4">
+            <button 
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleSubmit}
+              disabled={saving}
+              className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 shadow-md disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : document ? 'Update' : 'Create'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+// Date utilities
+const getDaysUntilExpiration = (expiresAt) => {
+  if (!expiresAt) return null;
+  const today = new Date();
+  const expiry = new Date(expiresAt);
+  return Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+};
+
+const getDocumentStatus = (expiresAt) => {
+  const days = getDaysUntilExpiration(expiresAt);
+  
+  if (days === null) {
+    return { 
+      status: 'unknown', 
+      label: 'Unknown', 
+      color: 'text-gray-600 bg-gray-100 border-gray-200' 
+    };
+  }
+  
+  if (days < 0) {
+    return { 
+      status: 'expired', 
+      label: 'Expired', 
+      color: 'text-red-600 bg-red-100 border-red-200' 
+    };
+  }
+  
+  if (days <= 7) {
+    return { 
+      status: 'critical', 
+      label: 'Critical', 
+      color: 'text-orange-600 bg-orange-100 border-orange-200' 
+    };
+  }
+  
+  if (days <= 30) {
+    return { 
+      status: 'warning', 
+      label: 'Expiring Soon', 
+      color: 'text-yellow-600 bg-yellow-100 border-yellow-200' 
+    };
+  }
+  
+  return { 
+    status: 'active', 
+    label: 'Active', 
+    color: 'text-green-600 bg-green-100 border-green-200' 
+  };
+};
+
+// Export utilities
+const exportToCSV = (data, filename = 'export') => {
+  if (!data || data.length === 0) {
+    alert('No data to export');
+    return;
+  }
+
+  const headers = Object.keys(data[0]);
+  const csvContent = [
+    headers.join(','),
+    ...data.map(row => 
+      headers.map(header => {
+        const value = row[header];
+        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
+          return `"${value.replace(/"/g, '""')}"`;
+        }
+        return value;
+      }).join(',')
+    )
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${filename}-${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+const prepareDocumentsForExport = (documents, vendors) => {
+  return documents.map(doc => {
+    const vendor = vendors.find(v => v.id === doc.vendorId);
+    const days = getDaysUntilExpiration(doc.expiresAt);
+    const status = getDocumentStatus(doc.expiresAt);
+    
+    return {
+      'Vendor': vendor?.name || 'Unknown',
+      'Document': doc.title,
+      'Type': doc.type,
+      'Issued Date': doc.issuedAt || 'N/A',
+      'Expiration Date': doc.expiresAt || 'N/A',
+      'Days Until Expiry': days !== null ? days : 'N/A',
+      'Status': status.label,
+      'Uploaded By': doc.uploadedBy || 'Unknown'
+    };
+  });
+};
+
+// Debounce hook
+const useDebounce = (value, delay = 500) => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
+// ============================================
+// MAIN APP COMPONENT
+// ============================================
+
 const VendorDocTracker = () => {
+  // Auth state
   const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState(null);
+  
+  // App state
   const [activeTab, setActiveTab] = useState('dashboard');
   const [vendors, setVendors] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [reminders, setReminders] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [organization, setOrganization] = useState(null);
+  
+  // UI state
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [showVendorModal, setShowVendorModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
-  const [showReminderModal, setShowReminderModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
   const [editingDocument, setEditingDocument] = useState(null);
   const [selectedVendor, setSelectedVendor] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [savingVendor, setSavingVendor] = useState(false);
+  
   // Login state
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
 
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  // Initialize storage
   useEffect(() => {
-    const init = async () => {
-      await initializeStorage();
-      setLoading(false);
+    const initStorage = async () => {
+      try {
+        let existing = null;
+        try {
+          existing = await window.storage.get('app-initialized');
+        } catch (error) {
+          console.log('Storage not yet initialized');
+        }
+        
+        if (!existing) {
+          await window.storage.set('organization', JSON.stringify({
+            id: 'org-1', name: 'Acme Corporation', timezone: 'America/New_York',
+            settings: { reminderDays: [30, 14, 7, 1], defaultChannel: 'email' }
+          }));
+          
+          await window.storage.set('users', JSON.stringify([
+            { id: 'u1', email: 'admin@acme.com', password: 'admin123', name: 'Admin User', role: 'admin' },
+            { id: 'u2', email: 'user@acme.com', password: 'user123', name: 'Regular User', role: 'user' }
+          ]));
+          
+          await window.storage.set('vendors', JSON.stringify([
+            { id: 'v1', name: 'TechSupply Inc', type: 'software', contact: 'john@techsupply.com', status: 'active' },
+            { id: 'v2', name: 'BuildCo Contractors', type: 'contractor', contact: 'mary@buildco.com', status: 'active' },
+            { id: 'v3', name: 'Office Supplies Ltd', type: 'supplier', contact: 'sales@officesup.com', status: 'active' }
+          ]));
+          
+          await window.storage.set('documents', JSON.stringify([
+            { id: 'd1', vendorId: 'v1', title: 'Software License', type: 'license', issuedAt: '2024-01-15', expiresAt: '2025-12-15', status: 'active', uploadedBy: 'Admin' },
+            { id: 'd2', vendorId: 'v2', title: 'Liability Insurance', type: 'insurance', issuedAt: '2024-06-01', expiresAt: '2025-11-25', status: 'active', uploadedBy: 'Admin' },
+            { id: 'd3', vendorId: 'v2', title: 'W-9 Tax Form', type: 'w9', issuedAt: '2024-01-10', expiresAt: '2025-11-20', status: 'active', uploadedBy: 'Admin' },
+            { id: 'd4', vendorId: 'v3', title: 'Certificate of Insurance', type: 'insurance', issuedAt: '2024-03-01', expiresAt: '2025-11-22', status: 'active', uploadedBy: 'Admin' }
+          ]));
+          
+          await window.storage.set('reminders', JSON.stringify([]));
+          await window.storage.set('audit-logs', JSON.stringify([]));
+          await window.storage.set('app-initialized', 'true');
+        }
+      } catch (error) {
+        console.error('Storage init error:', error);
+      }
+      setAuthLoading(false);
     };
-    init();
+    
+    initStorage();
   }, []);
 
+  // Load data when user logs in
   useEffect(() => {
     if (currentUser) {
       loadData();
@@ -175,7 +617,6 @@ const VendorDocTracker = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      await initializeStorage();
       const [orgData, vendorData, docData, reminderData, auditData] = await Promise.all([
         window.storage.get('organization'),
         window.storage.get('vendors'),
@@ -191,20 +632,21 @@ const VendorDocTracker = () => {
       if (auditData) setAuditLogs(JSON.parse(auditData.value));
     } catch (error) {
       console.error('Error loading:', error);
+      setErrorMessage('Failed to load data');
     }
     setLoading(false);
   };
 
-  const saveData = useCallback(async (key, data, setter) => {
+  const saveData = async (key, data) => {
     try {
       await window.storage.set(key, JSON.stringify(data));
-      setter(data);
     } catch (error) {
       console.error(`Error saving ${key}:`, error);
+      throw error;
     }
-  }, []);
+  };
 
-  const addAuditLog = useCallback(async (action, resourceType, resourceId, metadata = {}) => {
+  const addAuditLog = async (action, resourceType, resourceId, metadata = {}) => {
     const log = {
       id: `log-${Date.now()}`,
       action,
@@ -215,10 +657,11 @@ const VendorDocTracker = () => {
       user: currentUser?.name || 'System'
     };
     const newLogs = [...auditLogs, log];
-    await saveData('audit-logs', newLogs, setAuditLogs);
-  }, [auditLogs, currentUser, saveData]);
+    await saveData('audit-logs', newLogs);
+    setAuditLogs(newLogs);
+  };
 
-  // Memoized computed values
+  // Computed values
   const stats = useMemo(() => ({
     totalVendors: vendors.length,
     totalDocuments: documents.length,
@@ -232,13 +675,13 @@ const VendorDocTracker = () => {
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
       const vendor = vendors.find(v => v.id === doc.vendorId);
-      const matchesSearch = searchQuery === '' || 
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        vendor?.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = debouncedSearch === '' || 
+        doc.title?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        vendor?.name?.toLowerCase().includes(debouncedSearch.toLowerCase());
       
       if (statusFilter === 'all') return matchesSearch;
       const docStatus = getDocumentStatus(doc.expiresAt).status;
-      return matchesSearch && docStatus === statusFilter;
+      return matchesSearch && docStatus === statusFilter;      
     });
   }, [documents, vendors, searchQuery, statusFilter]);
 
